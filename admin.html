@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AZADOR Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="azador.css">
+<style>
+.login{min-height:100vh;display:grid;place-items:center}
+.login form{width:min(380px,100%);display:grid;gap:.9rem}
+main{padding-block:1.5rem}
+.ord{display:grid;grid-template-columns:300px 1fr;gap:1rem;align-items:start}
+@media(max-width:860px){.ord{grid-template-columns:1fr}}
+.list{padding:.6rem;max-height:calc(100vh - 110px);overflow:auto;display:grid;gap:.25rem;align-content:start}
+.li{display:grid;gap:.1rem;width:100%;text-align:start;font:inherit;color:inherit;background:none;border:1px solid transparent;border-radius:12px;padding:.65rem .8rem;cursor:pointer;transition:background .2s,border-color .2s}
+.li:hover{background:var(--s2)}.li.on{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 12%,transparent)}
+.r1{display:flex;justify-content:space-between;align-items:center}
+.li .tag{justify-self:start}
+.bdg{background:var(--danger);color:#fff;border-radius:99px;padding:0 .55rem;font-size:.75rem;font-weight:700}
+.lt{display:flex;gap:.5rem;padding:.8rem .4rem 0;flex-wrap:wrap}
+.detail{display:grid;gap:1rem;min-height:320px;align-content:start}
+.detail .chat{height:420px;min-height:0}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;align-items:end}
+.ctl label{display:grid;font-size:.9rem;color:var(--muted)}
+.idea{padding:.8rem 1rem;background:var(--s2);border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:.5rem}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1rem;margin-bottom:1rem}
+.kpi span{color:var(--muted);font-size:.92rem}.kpi b{display:block;font-size:1.8rem;line-height:1.5}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1rem}
+.hb{display:grid;grid-template-columns:90px 1fr 64px;gap:.7rem;align-items:center;font-size:.9rem;margin-block:.55rem}
+.hb div{height:10px;background:var(--s2);border-radius:99px;overflow:hidden}
+.hb i{display:block;height:100%;width:var(--w);border-radius:inherit;background:linear-gradient(90deg,var(--primary),var(--accent));animation:grow .6s var(--ease)}
+@keyframes grow{from{width:0}}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse}
+th,td{padding:.65rem .9rem;text-align:start;border-block-end:1px solid var(--bd);white-space:nowrap}th{color:var(--muted);font-weight:600}
+.detail .dlv{margin-top:0}.dlv label{display:grid;gap:.2rem;font-size:.9rem;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div id="login" class="wrap login">
+  <form class="card" id="lf">
+    <h2>AZADOR<span style="color:var(--primary)">-admin</span></h2>
+    <input type="password" id="pw" placeholder="كلمة السر" autocomplete="current-password" autofocus>
+    <button class="btn pri">دخول</button>
+    <p class="err" id="le"></p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="hdr"><div class="wrap">
+    <a href="#" class="logo">AZADOR<span>-admin</span></a>
+    <nav class="tabs" id="nav"><button data-v="orders">الطلبات</button><button data-v="finance">الأسعار والمداخيل</button><button data-v="stats">الإحصائيات</button></nav>
+    <div class="act">
+      <input type="color" id="pc" title="اللون الأساسي">
+      <button id="themeBtn" class="btn gh sm">الثيم</button>
+      <button id="out" class="btn gh sm">خروج</button>
+    </div>
+  </div></header>
+  <main class="wrap">
+    <section id="v-orders" class="ord"><aside class="card list" id="list"></aside><div class="card detail" id="detail"></div></section>
+    <section id="v-finance" hidden>
+      <div class="card" style="margin-bottom:1rem"><label class="muted" style="display:grid;gap:.3rem">بيانات حساب CCP (تظهر للزبون في صفحة المتابعة قبل الدفع)<textarea id="ccp" rows="2" placeholder="الاسم + رقم الحساب CCP + المفتاح"></textarea></label></div>
+      <div id="finBody"></div>
+    </section>
+    <section id="v-stats" hidden></section>
+  </main>
+</div>
+
+<script src="azador.js"></script>
+<script>if(typeof AZ==="undefined")document.body.innerHTML='<p style="padding:2rem;font:700 18px/1.8 sans-serif;color:#ff6b7a;direction:rtl">ملف azador.js غير موجود. ضع index.html وclient.html وadmin.html وazador.js وazador.css كلها في نفس المجلد ثم حدّث الصفحة.</p>'</script>
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const { DB, ST, esc, money, paid, waiting } = AZ;
+const PASS = "azador123"; // للتجربة فقط: الحماية الحقيقية ستكون عبر Firebase Auth
+const EMPTY = `<p class="muted" style="margin:auto">اختر طلباً من القائمة لفتح الشات معه.</p>`;
+const CL = { demoMsg: "رابط المعاينة (Demo) لتجربة موقعك قبل الدفع", finalMsg: "تم تأكيد الدفع! رابط موقعك النهائي", open: "فتح", copy: "نسخ الرابط", copied: "تم النسخ ✓", copyFail: "انسخه يدوياً" };
+let cur = null, off = null, view = "orders";
+
+const sum = (L, f) => L.reduce((a, o) => a + f(o), 0);
+const kpi = (l, v) => `<div class="card kpi"><span>${l}</span><b>${v}</b></div>`;
+const tag = o => `<span class="tag" data-s="${o.status}">${ST[o.status].ar}</span>`;
+const mk = t => { const d = new Date(t); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); };
+const months = () => { const r = [], n = new Date(); for (let i = 5; i >= 0; i--) { const x = new Date(n.getFullYear(), n.getMonth() - i, 1); r.push([mk(x), x.toLocaleDateString("ar-u-nu-latn", { month: "short", year: "2-digit" })]); } return r; };
+const bars = (rows, f = x => x) => { const m = Math.max(1, ...rows.map(r => r[1])); return rows.map(([l, v]) => `<div class="hb"><span>${esc(l)}</span><div><i style="--w:${v / m * 100}%"></i></div><b>${f(v)}</b></div>`).join("") || `<p class="muted">لا بيانات بعد</p>`; };
+
+/* ---- قائمة الطلبات ---- */
+function list() {
+  const L = DB.all().sort((a, b) => b.createdAt - a.createdAt);
+  $("#list").innerHTML = (L.map(o => { const w = waiting(o); return `<button class="li${o.id === cur ? " on" : ""}" data-id="${esc(o.id)}"><span class="r1"><b dir="ltr">${esc(o.id)}</b>${w ? `<span class="bdg">${w}</span>` : ""}</span><span>${esc(o.name)}</span>${tag(o)}</button>`; }).join("")
+    || `<p class="muted" style="padding:1rem">لا طلبات بعد. أرسل طلباً من الصفحة الرئيسية أو جرّب البيانات التجريبية.</p>`)
+    + `<div class="lt"><button class="btn gh sm" id="seed">بيانات تجريبية</button><button class="btn gh sm" id="clr">مسح الكل</button></div>`;
+}
+
+/* ---- تفاصيل الطلب + الشات ---- */
+function finLine() {
+  const o = cur && DB.get(cur); if (!o || !$("#fin")) return;
+  const due = Math.max(0, o.price - paid(o));
+  $("#fin").textContent = `المدفوع ${money(paid(o))} · المتبقي ${money(due)}`;
+  $("#stt").innerHTML = tag(o); $("#st").value = o.status;
+  $("#dst").textContent = `الديمو: ${o.demoUrl ? "محفوظ" : "—"} · الدفع: ${o.price && !due ? "مكتمل" : "بانتظار التأكيد"} · التسليم: ${o.unlocked ? "مفعّل ✓" : "غير مفعّل"}`;
+  $("#act").disabled = !!o.unlocked; $("#act").textContent = o.unlocked ? "تم تفعيل التسليم ✓" : "تأكيد دفع CCP وتفعيل التسليم";
+}
+
+function open(id) {
+  cur = id; off && off();
+  const o = DB.get(id); if (!o) return;
+  const d = new Date(o.createdAt).toLocaleDateString("ar-u-nu-latn", { day: "numeric", month: "long", year: "numeric" });
+  $("#detail").innerHTML = `
+    <div><h2>${esc(o.name)} <span id="stt"></span></h2>
+      <p class="muted"><span dir="ltr">${esc(o.id)}</span> · <a href="tel:${esc(o.phone)}" dir="ltr" style="color:inherit">${esc(o.phone)}</a> · ${d}</p></div>
+    <div class="ctl">
+      <label>الحالة<select id="st">${Object.keys(ST).map(k => `<option value="${k}"${k === o.status ? " selected" : ""}>${ST[k].ar}</option>`).join("")}</select></label>
+      <label>السعر المتفق عليه (دج)<input id="pr" type="number" min="0" value="${o.price || ""}"></label>
+      <label>دفعة جديدة (دج)<input id="pay" type="number" min="0"></label>
+      <button class="btn pri sm" id="sv">حفظ</button>
+    </div>
+    <p class="muted" id="fin"></p>
+    <div class="dlv">
+      <h3>التسليم</h3>
+      <label>رابط الديمو / المعاينة (Demo URL)<input id="du" dir="ltr" placeholder="https://demo.example.com" value="${esc(o.demoUrl || "")}"></label>
+      <label>رابط الموقع النهائي (Final Site URL)<input id="fu" dir="ltr" placeholder="https://example.com" value="${esc(o.finalUrl || "")}"></label>
+      <div class="lka"><button class="btn gh sm" id="svu">حفظ الروابط</button><button class="btn gh sm" id="sd">إرسال الديمو للزبون</button><button class="btn pri sm" id="act"></button></div>
+      <p class="muted" id="dst"></p><p id="dmsg" class="err"></p>
+    </div>
+    <div><h3>تفاصيل الطلب</h3><div class="chips" style="margin-top:.4rem">${o.options.map(x => `<span class="tag">${esc(x.t.ar)}</span>`).join("") || `<span class="muted">لم يختر مميزات</span>`}</div>
+      <p class="muted" style="margin-top:.4rem">الميزانية: ${o.budget ? money(o.budget) : o.budgetLater ? "نتفق بعد التواصل" : "غير محددة"}</p>
+      ${o.freeText ? `<p class="idea">${esc(o.freeText)}</p>` : ""}</div>
+    <div class="card chat" id="chat"></div>`;
+  finLine(); list();
+  $("#st").onchange = () => DB.update(id, x => { x.status = $("#st").value; });
+  $("#sv").onclick = () => { DB.update(id, x => { x.price = +$("#pr").value || 0; const a = +$("#pay").value; if (a > 0) x.payments.push({ amount: a, t: Date.now() }); }); $("#pay").value = ""; };
+  const say = (t, ok) => { $("#dmsg").className = ok ? "muted" : "err"; $("#dmsg").textContent = t; };
+  const urls = () => { // حفظ الروابط بعد التحقق (http/https فقط)
+    const d = AZ.url($("#du").value), f = AZ.url($("#fu").value);
+    if (d === null || f === null) { say("رابط غير صالح: يجب أن يبدأ بـ http:// أو https://"); return null; }
+    $("#du").value = d; $("#fu").value = f; DB.update(id, x => { x.demoUrl = d; x.finalUrl = f; }); return { d, f };
+  };
+  $("#svu").onclick = () => urls() && say("تم حفظ الروابط ✓", 1);
+  $("#sd").onclick = () => {
+    const u = urls(); if (!u) return; if (!u.d) return say("أدخل رابط الديمو أولاً");
+    DB.update(id, x => { x.messages.push({ from: "admin", kind: "demo", url: u.d, t: Date.now() }); }); say("أُرسل رابط الديمو للزبون في الشات ✓", 1);
+  };
+  $("#act").onclick = () => { // تأكيد CCP: يسجّل المتبقي كدفعة، ويفتح الرابط النهائي للزبون
+    const u = urls(); if (!u) return; if (!u.f) return say("أدخل رابط الموقع النهائي أولاً");
+    const o2 = DB.get(id), price = +$("#pr").value || o2.price; if (!price) return say("حدّد السعر المتفق عليه أولاً");
+    const due = Math.max(0, price - paid(o2));
+    if (!confirm(`تأكيد استلام الدفع عبر CCP${due ? " (" + money(due) + ")" : ""} وتفعيل التسليم للزبون؟`)) return;
+    DB.update(id, x => { x.price = price; if (due) x.payments.push({ amount: due, t: Date.now(), method: "CCP" }); x.unlocked = true; x.unlockedAt = Date.now(); x.status = "delivered"; x.messages.push({ from: "admin", kind: "final", url: u.f, t: Date.now() }); });
+    say("تم تفعيل التسليم وأُرسل الرابط النهائي للزبون ✓", 1);
+  };
+  off = AZ.Chat.mount($("#chat"), id, "admin", { ...CL, ph: "اكتب ردك...", send: "إرسال", empty: "لا رسائل بعد. ابدأ الرد على الزبون.", lang: "ar", title: o.name, sub: o.id });
+}
+
+/* ---- المالية ---- */
+function fin() {
+  const L = DB.all(), q = sum(L, o => o.price), p = sum(L, paid), n = L.filter(o => o.price).length;
+  $("#finBody").innerHTML = `<div class="kpis">${kpi("إجمالي الأسعار المتفق عليها", money(q))}${kpi("المداخيل المحصّلة", money(p))}${kpi("المتبقي", money(Math.max(0, q - p)))}${kpi("متوسط قيمة الطلب", money(n ? q / n : 0))}</div>
+  <div class="card tw"><table><tr><th>الطلب</th><th>الزبون</th><th>السعر</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th></tr>
+  ${L.map(o => `<tr><td dir="ltr">${esc(o.id)}</td><td>${esc(o.name)}</td><td>${money(o.price)}</td><td>${money(paid(o))}</td><td>${money(Math.max(0, o.price - paid(o)))}</td><td>${tag(o)}</td></tr>`).join("")}</table></div>`;
+}
+
+/* ---- الإحصائيات ---- */
+function stats() {
+  const L = DB.all(), M = months(), inc = {}, cnt = {}, opt = {}, sts = {}, add = (m, k, v = 1) => m[k] = (m[k] || 0) + v;
+  L.forEach(o => { add(cnt, mk(o.createdAt)); o.payments.forEach(x => add(inc, mk(x.t), x.amount)); o.options.forEach(x => add(opt, x.t.ar)); add(sts, ST[o.status].ar); });
+  const top = Object.entries(opt).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  $("#v-stats").innerHTML = `<div class="kpis">${kpi("عدد الطلبات", L.length)}${kpi("قيد التنفيذ", L.filter(o => o.status === "in_progress").length)}${kpi("تم التسليم", L.filter(o => ["delivered", "closed"].includes(o.status)).length)}${kpi("المداخيل", money(sum(L, paid)))}</div>
+  <div class="g2">
+    <div class="card"><h3>الطلبات حسب الشهر</h3>${bars(M.map(([k, l]) => [l, cnt[k] || 0]))}</div>
+    <div class="card"><h3>المداخيل حسب الشهر</h3>${bars(M.map(([k, l]) => [l, inc[k] || 0]), money)}</div>
+    <div class="card"><h3>الاختيارات الأكثر طلباً</h3>${bars(top)}</div>
+    <div class="card"><h3>توزيع الحالات</h3>${bars(Object.entries(sts))}</div>
+  </div>
+  <div class="card tw" style="margin-top:1rem"><table><tr><th>الشهر</th><th>الطلبات</th><th>المداخيل</th></tr>${M.map(([k, l]) => `<tr><td>${l}</td><td>${cnt[k] || 0}</td><td>${money(inc[k] || 0)}</td></tr>`).join("")}</table></div>`;
+}
+
+/* ---- بيانات تجريبية ---- */
+function seed() {
+  const N = ["صفحة هبوط", "موقع متعدد الصفحات", "معرض أعمال", "متجر إلكتروني", "نظام حجز", "لوحة تحكم", "تحسين SEO", "ثلاث لغات"],
+    names = ["أمين", "سارة", "يوسف", "ليلى", "كريم", "نور", "ياسين", "هدى", "سمير", "مريم", "رياض", "إيمان"], S = Object.keys(ST), now = Date.now(), D = 864e5, L = DB.all();
+  names.forEach(n => {
+    const t = now - Math.random() * 170 * D, st = S[Math.random() * S.length | 0], pr = (3 + Math.random() * 27 | 0) * 5000, quoted = !["new", "reviewing"].includes(st);
+    const opts = [...N.keys()].sort(() => Math.random() - .5).slice(0, 1 + Math.random() * 3 | 0).map(k => ({ id: "d" + k, t: { ar: N[k], fr: N[k], en: N[k] } }));
+    L.push({ id: DB.newId(), name: n, phone: "0550" + (100000 + Math.random() * 899999 | 0), lang: "ar", type: "build", options: opts, budget: null, budgetLater: true, freeText: "", status: st, price: quoted ? pr : 0, createdAt: t, messages: [],
+      payments: ["in_progress", "delivered", "closed"].includes(st) ? [{ amount: Math.round(pr * (st === "in_progress" ? .5 : 1)), t: Math.min(now, t + 5 * D) }] : [] });
+  });
+  DB.save(L);
+}
+
+/* ---- التنقل والأحداث ---- */
+function show(v) {
+  view = v; $$("#nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  ["orders", "finance", "stats"].forEach(k => { const e = $("#v-" + k); e.hidden = k !== v; if (k === v) { e.classList.remove("enter"); void e.offsetWidth; e.classList.add("enter"); } });
+  if (v === "finance") fin(); if (v === "stats") stats();
+}
+function refresh() { list(); finLine(); if (view === "finance") fin(); if (view === "stats") stats(); }
+
+$("#nav").onclick = e => { const b = e.target.closest("button"); if (b) show(b.dataset.v); };
+$("#list").onclick = e => {
+  const b = e.target.closest(".li");
+  if (b) open(b.dataset.id);
+  else if (e.target.id === "seed") seed();
+  else if (e.target.id === "clr" && confirm("مسح كل الطلبات؟")) { cur = null; off && off(); $("#detail").innerHTML = EMPTY; DB.save([]); }
+};
+$("#lf").onsubmit = e => { e.preventDefault(); if ($("#pw").value === PASS) { sessionStorage.setItem("azador.admin", "1"); enter(); } else $("#le").textContent = "كلمة السر غير صحيحة"; };
+$("#out").onclick = () => { sessionStorage.removeItem("azador.admin"); location.reload(); };
+$("#themeBtn").onclick = AZ.Theme.toggle;
+$("#pc").value = AZ.ls("primary") || "#7c5cff";
+$("#pc").oninput = e => AZ.Theme.primary(e.target.value);
+$("#ccp").value = AZ.ls("ccp") || "";
+$("#ccp").oninput = e => AZ.ls("ccp", e.target.value);
+
+function enter() { $("#login").hidden = true; $("#app").hidden = false; $("#detail").innerHTML = EMPTY; list(); show("orders"); }
+DB.on(refresh);
+if (sessionStorage.getItem("azador.admin") === "1") enter();
+</script>
+</body>
+</html>
